@@ -32,7 +32,7 @@ pub fn skip(rule: Rule) -> Rule {
     Rule {
         name,
         ty,
-        expr: if ty == RuleType::Atomic {
+        expr: if ty.has(RuleType::Atomic) {
             expr.map_top_down(|expr| {
                 if let Expr::Rep(expr) = expr.clone() {
                     if let Expr::Seq(lhs, rhs) = *expr {

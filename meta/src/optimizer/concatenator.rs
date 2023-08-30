@@ -15,7 +15,7 @@ pub fn concatenate(rule: Rule) -> Rule {
         name,
         ty,
         expr: expr.map_bottom_up(|expr| {
-            if ty == RuleType::Atomic {
+            if rule.ty.has(RuleType::Atomic) {
                 match expr {
                     Expr::Seq(lhs, rhs) => match (*lhs, *rhs) {
                         (Expr::Str(lhs), Expr::Str(rhs)) => Expr::Str(lhs + &rhs),

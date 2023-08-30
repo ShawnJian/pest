@@ -222,6 +222,7 @@ pub fn rename_meta_rule(rule: &Rule) -> String {
         Rule::atomic_modifier => "`@`".to_owned(),
         Rule::compound_atomic_modifier => "`$`".to_owned(),
         Rule::non_atomic_modifier => "`!`".to_owned(),
+        Rule::semi_atomic_modifier => "`#`".to_owned(),
         Rule::opening_brace => "`{`".to_owned(),
         Rule::closing_brace => "`}`".to_owned(),
         Rule::opening_brack => "`[`".to_owned(),
@@ -270,17 +271,18 @@ fn consume_rules_with_spans(
 
             pairs.next().unwrap(); // assignment_operator
 
-            let ty = if pairs.peek().unwrap().as_rule() != Rule::opening_brace {
-                match pairs.next().unwrap().as_rule() {
+            let mut ty = RuleType::Normal;
+            while pairs.peek().unwrap().as_rule() != Rule::opening_brace {
+                let t = match pairs.next().unwrap().as_rule() {
                     Rule::silent_modifier => RuleType::Silent,
                     Rule::atomic_modifier => RuleType::Atomic,
                     Rule::compound_atomic_modifier => RuleType::CompoundAtomic,
                     Rule::non_atomic_modifier => RuleType::NonAtomic,
+                    Rule::semi_atomic_modifier => RuleType::SemiAtomic,
                     _ => unreachable!(),
-                }
-            } else {
-                RuleType::Normal
-            };
+                };
+                ty |= t;
+            }
 
             pairs.next().unwrap(); // opening_brace
 

@@ -63,6 +63,8 @@ pub enum Atomicity {
     Atomic,
     /// The same as atomic, but inner tokens are produced as normal.
     CompoundAtomic,
+    /// implicit separator is enabled
+    SemiAtomic,
     /// implicit whitespace is enabled
     NonAtomic,
 }

@@ -9,6 +9,10 @@
 
 //! Types for the pest's abstract syntax tree.
 
+use std::ops;
+use std::convert::TryFrom;
+use num_enum::TryFromPrimitive;
+
 /// A grammar rule
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Rule {
@@ -21,16 +25,17 @@ pub struct Rule {
 }
 
 /// All possible rule types
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, TryFromPrimitive)]
+#[repr(u32)]
 pub enum RuleType {
     /// The normal rule type
-    Normal,
+    Normal = 0b00000,
     /// Silent rules are just like normal rules
     /// — when run, they function the same way —
     /// except they do not produce pairs or tokens.
     /// If a rule is silent, it will never appear in a parse result.
     /// (their syntax is `_{ ... }`)
-    Silent,
+    Silent = 0b00001,
     /// atomic rule prevent implicit whitespace: inside an atomic rule,
     /// the tilde ~ means "immediately followed by",
     /// and repetition operators (asterisk * and plus sign +)
@@ -38,14 +43,42 @@ pub enum RuleType {
     /// called from an atomic rule are also treated as atomic.
     /// In an atomic rule, interior matching rules are silent.
     /// (their syntax is `@{ ... }`)
-    Atomic,
+    Atomic = 0b00010,
     /// Compound atomic rules are similar to atomic rules,
     /// but they produce inner tokens as normal.
     /// (their syntax is `${ ... }`)
-    CompoundAtomic,
+    CompoundAtomic = 0b00100,
     /// Non-atomic rules cancel the effect of atomic rules.
     /// (their syntax is `!{ ... }`)
-    NonAtomic,
+    SemiAtomic = 0b01000,
+    /// Separator rules are similar to normal rules
+    /// — when run, they function the same way —
+    /// except they produce SEPARATOR tokens,
+    /// even these tokens already specified in WHITESPACE.
+    /// (their syntax is `#{ ... }`)
+    NonAtomic = 0b10000,
+}
+
+impl RuleType {
+    /// Check if the rule type is enabled
+    pub fn has(self, ty :RuleType) -> bool {
+        return self & ty != RuleType::Normal || (self == RuleType::Normal && ty == RuleType::Normal)
+    }
+}
+
+impl ops::BitAnd<RuleType> for RuleType {
+    type Output = Self;
+    fn bitand(self, _rhs: RuleType) -> RuleType {
+        let result = RuleType::try_from(self as u32 & _rhs as u32);
+        result.unwrap()
+    }
+}
+
+impl ops::BitOrAssign<RuleType> for RuleType {
+    fn bitor_assign(&mut self, _rhs: RuleType) {
+        let result = RuleType::try_from(*self as u32 & _rhs as u32);
+        *self = result.unwrap()
+    }
 }
 
 /// All possible rule expressions

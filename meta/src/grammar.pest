@@ -51,19 +51,23 @@ modifier = _{
   | atomic_modifier
   | compound_atomic_modifier
   | non_atomic_modifier
+  | semi_atomic_modifier
 }
 
-/// Silent rule prefix.
+/// Silent rule prefix. - explicit WHITESPACE and COMMENT, no self name
 silent_modifier = { "_" }
 
-/// Atomic rule prefix.
+/// Atomic rule prefix. - explicit WHITESPACE and COMMENT, no children's names
 atomic_modifier = { "@" }
 
-/// Compound atomic rule prefix.
+/// Compound atomic rule prefix. - explicit WHITESPACE and COMMENT, have all names
 compound_atomic_modifier = { "$" }
 
-/// Non-atomic rule prefix.
+/// Non-atomic rule prefix. - children back to normal.
 non_atomic_modifier = { "!" }
+
+/// Compound-separating rule prefix. - explicit SEPARATOR
+semi_atomic_modifier = { "#" }
 
 /// A tag label.
 tag_id = @{ "#" ~ ("_" | alpha) ~ ("_" | alpha_num)* }

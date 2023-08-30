@@ -260,7 +260,7 @@ fn generate_patterns(rules: &[OptimizedRule], uses_eoi: bool) -> TokenStream {
 
 fn generate_rule(rule: OptimizedRule) -> TokenStream {
     let name = format_ident!("r#{}", rule.name);
-    let expr = if rule.ty == RuleType::Atomic || rule.ty == RuleType::CompoundAtomic {
+    let expr = if rule.ty.has(RuleType::Atomic) || rule.ty.has(RuleType::CompoundAtomic) {
         generate_expr_atomic(rule.expr)
     } else if rule.name == "WHITESPACE" || rule.name == "COMMENT" {
         let atomic = generate_expr_atomic(rule.expr);
@@ -276,8 +276,8 @@ fn generate_rule(rule: OptimizedRule) -> TokenStream {
 
     let box_ty = box_type();
 
-    match rule.ty {
-        RuleType::Normal => quote! {
+    if rule.ty.has(RuleType::Normal) {
+        return quote! {
             #[inline]
             #[allow(non_snake_case, unused_variables)]
             pub fn #name(state: #box_ty<::pest::ParserState<'_, Rule>>) -> ::pest::ParseResult<#box_ty<::pest::ParserState<'_, Rule>>> {
@@ -285,15 +285,17 @@ fn generate_rule(rule: OptimizedRule) -> TokenStream {
                     #expr
                 })
             }
-        },
-        RuleType::Silent => quote! {
+        }
+    } else if rule.ty.has(RuleType::Silent) {
+        return quote! {
             #[inline]
             #[allow(non_snake_case, unused_variables)]
             pub fn #name(state: #box_ty<::pest::ParserState<'_, Rule>>) -> ::pest::ParseResult<#box_ty<::pest::ParserState<'_, Rule>>> {
                 #expr
             }
-        },
-        RuleType::Atomic => quote! {
+        }
+    } else if rule.ty.has(RuleType::Atomic) {
+        return quote! {
             #[inline]
             #[allow(non_snake_case, unused_variables)]
             pub fn #name(state: #box_ty<::pest::ParserState<'_, Rule>>) -> ::pest::ParseResult<#box_ty<::pest::ParserState<'_, Rule>>> {
@@ -303,8 +305,9 @@ fn generate_rule(rule: OptimizedRule) -> TokenStream {
                     })
                 })
             }
-        },
-        RuleType::CompoundAtomic => quote! {
+        }
+    } else if rule.ty.has(RuleType::CompoundAtomic) {
+        return quote! {
             #[inline]
             #[allow(non_snake_case, unused_variables)]
             pub fn #name(state: #box_ty<::pest::ParserState<'_, Rule>>) -> ::pest::ParseResult<#box_ty<::pest::ParserState<'_, Rule>>> {
@@ -314,8 +317,21 @@ fn generate_rule(rule: OptimizedRule) -> TokenStream {
                     })
                 })
             }
-        },
-        RuleType::NonAtomic => quote! {
+        }
+    } else if rule.ty.has(RuleType::SemiAtomic) {
+        return quote! {
+            #[inline]
+            #[allow(non_snake_case, unused_variables)]
+            pub fn #name(state: #box_ty<::pest::ParserState<'_, Rule>>) -> ::pest::ParseResult<#box_ty<::pest::ParserState<'_, Rule>>> {
+                state.atomic(::pest::Atomicity::SemiAtomic, |state| {
+                    state.rule(Rule::#name, |state| {
+                        #expr
+                    })
+                })
+            }
+        }
+    } else if rule.ty.has(RuleType::NonAtomic) {
+        return quote! {
             #[inline]
             #[allow(non_snake_case, unused_variables)]
             pub fn #name(state: #box_ty<::pest::ParserState<'_, Rule>>) -> ::pest::ParseResult<#box_ty<::pest::ParserState<'_, Rule>>> {
@@ -325,8 +341,9 @@ fn generate_rule(rule: OptimizedRule) -> TokenStream {
                     })
                 })
             }
-        },
+        }
     }
+    return expr;
 }
 
 fn generate_skip(rules: &[OptimizedRule]) -> TokenStream {

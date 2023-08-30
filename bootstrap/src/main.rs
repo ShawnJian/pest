@@ -4,6 +4,7 @@ extern crate pest_generator;
 
 use pest_generator::derive_parser;
 use std::{fs::File, io::prelude::*, path::Path};
+use rust_format::{Formatter, RustFmt};
 
 fn main() {
     let pest = Path::new(concat!(
@@ -25,6 +26,6 @@ fn main() {
     };
 
     let mut file = File::create(rs).unwrap();
-
-    writeln!(file, "pub struct PestParser;\n{}", derived,).unwrap();
+    let formatted = RustFmt::default().format_str(derived.to_string(),).unwrap();
+    writeln!(file, "pub struct PestParser;\n{}", formatted,).unwrap();
 }
