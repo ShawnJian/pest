@@ -3,7 +3,13 @@ extern crate quote;
 extern crate pest_generator;
 
 use pest_generator::derive_parser;
-use std::{fs::File, io::prelude::*, path::Path};
+use std::{
+    env,
+    fs::File,
+    io::prelude::*,
+    path::{Path, PathBuf},
+};
+
 use rust_format::{Formatter, RustFmt};
 
 fn main() {
@@ -11,10 +17,17 @@ fn main() {
         env!("CARGO_MANIFEST_DIR"),
         "/../meta/src/grammar.pest"
     ));
-    let rs = Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../meta/src/grammar.rs"
-    ));
+    let rs: PathBuf = if should_bootstrap_in_src() {
+        Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../meta/src/grammar.rs"
+        ))
+        .to_owned()
+    } else {
+        // the path is passed via command-line arguments
+        let path = env::args().nth(1).expect("path to grammar.rs");
+        PathBuf::from(path)
+    };
 
     let derived = {
         let path = pest.to_string_lossy();
@@ -28,4 +41,14 @@ fn main() {
     let mut file = File::create(rs).unwrap();
     let formatted = RustFmt::default().format_str(derived.to_string(),).unwrap();
     writeln!(file, "pub struct PestParser;\n{}", formatted,).unwrap();
+}
+
+#[cfg(not(feature = "not-bootstrap-in-src"))]
+fn should_bootstrap_in_src() -> bool {
+    true
+}
+
+#[cfg(feature = "not-bootstrap-in-src")]
+fn should_bootstrap_in_src() -> bool {
+    false
 }
