@@ -25,6 +25,10 @@ use pest_meta::optimizer::{OptimizedExpr, OptimizedRule};
 
 use std::collections::HashMap;
 use std::panic::{RefUnwindSafe, UnwindSafe};
+use std::time::Instant;
+
+pub use std::sync::atomic::AtomicUsize;
+pub use std::sync::atomic::Ordering;
 
 mod macros;
 
@@ -39,7 +43,12 @@ type ListenerFn =
 pub struct Vm {
     rules: HashMap<String, OptimizedRule>,
     listener: Option<ListenerFn>,
+    start: Instant,
 }
+
+static COL: AtomicUsize = AtomicUsize::new(0);
+static ROW: AtomicUsize = AtomicUsize::new(0);
+static POS: AtomicUsize = AtomicUsize::new(0);
 
 impl Vm {
     /// Creates a new `Vm` from optimized rules
@@ -48,6 +57,7 @@ impl Vm {
         Vm {
             rules,
             listener: None,
+            start: Instant::now(),
         }
     }
 
@@ -59,6 +69,7 @@ impl Vm {
         Vm {
             rules,
             listener: Some(listener),
+            start: Instant::now(),
         }
     }
 
@@ -126,7 +137,7 @@ impl Vm {
         };
 
         if let Some(rule) = self.rules.get(rule) {
-            if rule.name == "WHITESPACE" || rule.name == "COMMENT" {
+            return if rule.name == "WHITESPACE" || rule.name == "COMMENT" {
                 if rule.ty.has(RuleType::Normal) {
                     return state.rule(&rule.name, |state| {
                         state.atomic(Atomicity::Atomic, |state| {
@@ -159,14 +170,22 @@ impl Vm {
                         state.rule(&rule.name, |state| self.parse_expr(&rule.expr, state))
                     })
                 } else if rule.ty.has(RuleType::NonAtomic) {
-                    return state.atomic(Atomicity::Atomic, |state| {
+                    return state.atomic(Atomicity::NonAtomic, |state| {
                         state.rule(&rule.name, |state| self.parse_expr(&rule.expr, state))
                     })
                 }
-                return state.atomic(Atomicity::Atomic, |state| {
+                state.atomic(Atomicity::Atomic, |state| {
                     self.parse_expr(&rule.expr, state)
-                });
+                })
             } else {
+                let (_, col) = state.as_ref().position().line_col();
+                if rule.name != "blank" && rule.name != "eol" {
+                    print!("{:?}->", rule.name);
+                }
+                // let prev = COL.load(Ordering::SeqCst);
+                if col > COL.fetch_max(col, Ordering::SeqCst) {
+                    println!("");
+                }
                 if rule.ty.has(RuleType::Normal) {
                     return state.rule(&rule.name, move |state| self.parse_expr(&rule.expr, state));
                 } else if rule.ty.has(RuleType::Silent) {
@@ -199,7 +218,7 @@ impl Vm {
                         state.rule(&rule.name, |state| self.parse_expr(&rule.expr, state))
                     })
                 }
-                return self.parse_expr(&rule.expr, state);
+                self.parse_expr(&rule.expr, state)
             }
         } else {
             if let Some(property) = unicode::by_name(rule) {
@@ -216,16 +235,20 @@ impl Vm {
         expr: &'a OptimizedExpr,
         state: Box<ParserState<'i, &'a str>>,
     ) -> ParseResult<Box<ParserState<'i, &'a str>>> {
-        match *expr {
-            OptimizedExpr::Str(ref string) => state.match_string(string),
-            OptimizedExpr::Insens(ref string) => state.match_insensitive(string),
+        let result = match *expr {
+            OptimizedExpr::Str(ref string) =>
+                state.match_string(string),
+            OptimizedExpr::Insens(ref string) =>
+                state.match_insensitive(string),
             OptimizedExpr::Range(ref start, ref end) => {
                 let start = start.chars().next().expect("empty char literal");
                 let end = end.chars().next().expect("empty char literal");
 
                 state.match_range(start..end)
             }
-            OptimizedExpr::Ident(ref name) => self.parse_rule(name, state),
+            OptimizedExpr::Ident(ref name) => {
+                self.parse_rule(name, state)
+            },
             OptimizedExpr::PeekSlice(start, end) => {
                 state.stack_match_peek_slice(start, end, MatchDir::BottomToTop)
             }
@@ -281,7 +304,41 @@ impl Vm {
             OptimizedExpr::RestoreOnErr(ref expr) => {
                 state.restore_on_err(|state| self.parse_expr(expr, state))
             }
+        };
+
+        if result.is_ok() {
+            let (r, c) = result.as_ref().unwrap().position().line_col();
+            let pos = result.as_ref().unwrap().position().pos();
+            match expr {
+                OptimizedExpr::Str(s) |
+                OptimizedExpr::Insens(s) => {
+                    if pos > POS.fetch_max(pos, Ordering::SeqCst) {//change position
+                        if s != "SOI" && s != "NEWLINE" && s != "blank" && s != "" {
+                            print!("{}", s.as_str());
+                        }
+                    }
+                },
+                OptimizedExpr::Ident(s) => {
+                    if r > ROW.fetch_max(r, Ordering::SeqCst) {//change line
+                        COL.store(0, Ordering::SeqCst);
+                        print!("\n{:08.3?}s [{:02}] ", self.start.elapsed().as_millis() as f64/1000.0, r);
+                    }
+                    let start = POS.load(Ordering::SeqCst);
+                    if pos > POS.fetch_max(pos, Ordering::SeqCst) {//change position
+                        if s != "SOI" && s != "NEWLINE" && s != "" {
+                            let content = result.as_ref().unwrap().position().span_to(start);
+                            if s == "ANY" || s == "ASCII_ALPHA" || s == "blank" {
+                                print!("{}", content.as_str());
+                            } else {
+                                print!(" ({:02}){:?}:{:?} ", c, s, content.as_str());
+                            }
+                        }
+                    }
+                },
+                _=> {},
+            }
         }
+        result
     }
 
     fn skip<'a, 'i>(

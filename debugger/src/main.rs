@@ -47,6 +47,11 @@ impl Cli {
         self.context.load_input(&path)
     }
 
+    fn timeout(&mut self, sec: &String) {
+        let t:u64 = sec.parse().expect("Invalid timeout");
+        self.context.set_timeout(t)
+    }
+
     fn breakpoint(&mut self, rule: &str) {
         self.context.add_breakpoint(rule.to_owned());
     }
@@ -55,7 +60,7 @@ impl Cli {
         let (sender, receiver) = mpsc::sync_channel(1);
         let rec = &receiver;
         self.context.run(rule, sender)?;
-        match rec.recv_timeout(Duration::from_secs(5)) {
+        match rec.recv_timeout(Duration::from_secs(self.context.timeout)) {
             Ok(DebuggerEvent::Breakpoint(rule, pos)) => {
                 let error: Error<()> = Error::new_from_pos(
                     ErrorVariant::CustomError {
@@ -117,6 +122,7 @@ impl Cli {
              c                             - continue\n\
              l                             - list breakpoints\n\
              h                             - help\n\
+             t                             - timeout\n\
          "
         );
     }
@@ -144,6 +150,7 @@ impl Cli {
                 self.context.delete_breakpoint(&x[2..]);
             }
             x if x.starts_with("r ") => self.run(&x[2..])?,
+            x if x.starts_with("t ") => self.timeout(&x[2..].to_owned()),
             x => Cli::unrecognized(x),
         };
         Ok(())
@@ -186,6 +193,7 @@ struct CliArgs {
     rule: Option<String>,
     breakpoint: Option<String>,
     session_file: Option<PathBuf>,
+    timeout: Option<String>,
     no_update: bool,
 }
 
@@ -197,6 +205,7 @@ impl Default for CliArgs {
             rule: None,
             breakpoint: None,
             session_file: None,
+            timeout: None,
             no_update: false,
         };
         let args = std::env::args();
@@ -244,6 +253,13 @@ impl Default for CliArgs {
                         std::process::exit(1);
                     }
                 }
+                "-t" | "--timeout" => {
+                    if let Some(sec) = iter.next() {
+                        result.timeout = Some(sec);
+                    } else {
+                        result.timeout = Some("5".to_string());
+                    }
+                }
                 "--no-update" => {
                     result.no_update = true;
                 }
@@ -259,6 +275,7 @@ impl Default for CliArgs {
                          -b, --breakpoint <rule>         - breakpoint at rule\n\
                          -s, --session <session file>    - load session history file\n\
                          -h, --help                      - print this help menu\n\
+                         -t, --timeout                   - timeout for parsing\n\
                      "
                     );
                     std::process::exit(0);
@@ -290,6 +307,9 @@ impl CliArgs {
         }
         if let Some(breakpoint) = &self.breakpoint {
             context.breakpoint(breakpoint);
+        }
+        if let Some(timeout) = &self.timeout {
+            context.timeout(timeout);
         }
         if let Some(rule) = self.rule {
             if let Err(e) = context.run(&rule) {

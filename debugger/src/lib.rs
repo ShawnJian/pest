@@ -132,6 +132,8 @@ pub struct DebuggerContext {
     is_done: Arc<AtomicBool>,
     grammar: Option<Vec<OptimizedRule>>,
     input: Option<String>,
+    /// Timeout for parsing
+    pub timeout: u64,
     breakpoints: Arc<Mutex<HashSet<String>>>,
 }
 
@@ -182,6 +184,13 @@ impl DebuggerContext {
         Ok(())
     }
 
+    /// Set timeout in seconds.
+    pub fn set_timeout(&mut self, sec: u64) {
+        if sec > 0 {
+            self.timeout = sec;
+        }
+    }
+    
     /// Loads a parsing input from a string.
     pub fn load_input_direct(&mut self, input: String) {
         self.input = Some(input);
@@ -358,6 +367,7 @@ impl Default for DebuggerContext {
             is_done: Arc::new(AtomicBool::new(false)),
             grammar: None,
             input: None,
+            timeout: 5,
             breakpoints: Arc::new(Mutex::new(HashSet::new())),
         }
     }

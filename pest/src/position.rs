@@ -84,6 +84,29 @@ impl<'i> Position<'i> {
         self.pos
     }
 
+    
+    /// Creates a `Span` from two `Position`s.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use pest::Position;
+    /// let input = "ab";
+    /// let span = start.span_to(0);
+    ///
+    /// assert_eq!(span.start(), 0);
+    /// assert_eq!(span.end(), 0);
+    /// ```
+    #[inline]
+    pub fn span_to(&self, other: usize) -> span::Span<'i> {
+        // This is safe because the pos field of a Position should always be a valid str index.
+        if self.pos > other {
+            unsafe { span::Span::new_unchecked(self.input, other, self.pos) }
+        } else {
+            unsafe { span::Span::new_unchecked(self.input, self.pos, other) }
+        }
+    }
+
     /// Creates a `Span` from two `Position`s.
     ///
     /// # Panics
@@ -107,7 +130,11 @@ impl<'i> Position<'i> {
         /* && self.input.get(self.pos..other.pos).is_some() */
         {
             // This is safe because the pos field of a Position should always be a valid str index.
-            unsafe { span::Span::new_unchecked(self.input, self.pos, other.pos) }
+            if self.pos > other.pos {
+                unsafe { span::Span::new_unchecked(self.input, other.pos, self.pos) }
+            } else {
+                unsafe { span::Span::new_unchecked(self.input, self.pos, other.pos) }
+            }
         } else {
             // TODO: maybe a panic if self.pos < other.pos
             panic!("span created from positions from different inputs")
