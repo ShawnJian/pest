@@ -6,7 +6,6 @@
 // license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
-use std::collections::HashMap;
 
 use crate::optimizer::*;
 
@@ -103,7 +102,7 @@ mod tests {
         }];
 
         assert_eq!(
-            restore_on_err(rules[0].clone(), &to_hash_map(&rules)),
+            restore_on_err(rules[0].clone(), &to_optimized_hash_map(&rules)),
             rules[0].clone()
         );
     }
@@ -123,7 +122,7 @@ mod tests {
         };
 
         assert_eq!(
-            restore_on_err(rules[0].clone(), &to_hash_map(&rules)),
+            restore_on_err(rules[0].clone(), &to_optimized_hash_map(&rules)),
             restored
         );
     }
@@ -146,7 +145,7 @@ mod tests {
         };
 
         assert_eq!(
-            restore_on_err(rules[0].clone(), &to_hash_map(&rules)),
+            restore_on_err(rules[0].clone(), &to_optimized_hash_map(&rules)),
             restored
         );
     }

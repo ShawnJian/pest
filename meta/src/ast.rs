@@ -10,7 +10,6 @@
 //! Types for the pest's abstract syntax tree.
 
 use std::ops;
-use std::convert::TryFrom;
 use num_enum::TryFromPrimitive;
 
 /// A grammar rule

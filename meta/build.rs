@@ -17,7 +17,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn display_digest(digest: &[u8]) -> String {
-    digest.iter().map(|byte| format!("{:02x}", byte)).collect()
+    use std::fmt::Write;
+    digest.iter().fold(String::new(), |mut output, b| {
+        let _ = write!(output, "{b:02x}");
+        output
+    })
 }
 
 fn main() {
@@ -45,7 +49,11 @@ fn main() {
         sha.update(current_grammar.as_bytes());
         let current_hash = display_digest(&sha.finalize());
 
-        // If `grammar.pest` has changed
+        // If `grammar.pest` has changed.
+        // Other-words one of these variants:
+        // * grammar.rs doesn't exits
+        // * grammar.rs exists, but `old_hash` doesn't exists (seems like internal error)
+        // * grammar.rs exists, but `old_hash` doesn't equal to current_hash (it means grammar.pest)
         if !grammar_rs_path.exists()
             || old_hash.as_ref().map(|it| it.trim()) != Some(current_hash.trim())
         {
@@ -56,6 +64,7 @@ fn main() {
 
             #[cfg(not(feature = "not-bootstrap-in-src"))]
             {
+                // We want to store `grammar.rs` next to `grammar.pest`.
                 // This "dynamic linking" is probably so fragile I don't even want to hear it
                 let status = Command::new(manifest_dir.join("../target/debug/pest_bootstrap"))
                     .spawn()
@@ -105,7 +114,7 @@ fn main() {
                 }
             }
         } else {
-            println!("       Fresh `meta/src/grammar.rs`");
+            println!("       Previous `meta/src/grammar.rs`");
         }
     } else {
         assert!(

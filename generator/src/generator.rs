@@ -7,20 +7,25 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
+//! Helpers to generate the code for the Parser `derive``.
+
 use std::path::PathBuf;
 
 use proc_macro2::TokenStream;
 use quote::{ToTokens, TokenStreamExt};
-use syn::{self, Ident};
 
 use pest::unicode::unicode_property_names;
 use pest_meta::ast::*;
 use pest_meta::optimizer::*;
+use syn::Ident;
 
 use crate::docs::DocComment;
-use crate::ParsedDerive;
+use crate::parse_derive::ParsedDerive;
 
-pub(crate) fn generate(
+/// Generates the corresponding parser based based on the processed macro input. If `include_grammar`
+/// is set to true, it'll generate an explicit "include_str" statement (done in pest_derive, but
+/// turned off in the local bootstrap).
+pub fn generate(
     parsed_derive: ParsedDerive,
     paths: Vec<PathBuf>,
     rules: Vec<OptimizedRule>,
@@ -203,7 +208,7 @@ fn generate_enum(
     uses_eoi: bool,
     non_exhaustive: bool,
 ) -> TokenStream {
-    let rules = rules.iter().map(|rule| {
+    let rule_variants = rules.iter().map(|rule| {
         let rule_name = format_ident!("r#{}", rule.name);
 
         match doc_comment.line_docs.get(&rule.name) {
@@ -234,17 +239,32 @@ fn generate_enum(
     if uses_eoi {
         result.append_all(quote! {
             {
+                #[doc = "End-of-input"]
                 EOI,
-                #( #rules ),*
+                #( #rule_variants ),*
             }
         });
     } else {
         result.append_all(quote! {
             {
-                #( #rules ),*
+                #( #rule_variants ),*
             }
         })
     };
+
+    let rules = rules.iter().map(|rule| {
+        let rule_name = format_ident!("r#{}", rule.name);
+        quote! { #rule_name }
+    });
+
+    result.append_all(quote! {
+        impl Rule {
+            pub fn all_rules() -> &'static[Rule] {
+                &[ #(Rule::#rules), * ]
+            }
+        }
+    });
+
     result
 }
 
@@ -577,7 +597,7 @@ fn generate_expr(expr: OptimizedExpr) -> TokenStream {
                 quote! { ::alloc::borrow::Cow::Borrowed(#tag) }
             };
             quote! {
-                #expr.and_then(|state| state.tag_node(#tag_cow))
+                #expr.and_then(|state| state.tag_node(#tag))
             }
         }
     }
@@ -738,7 +758,7 @@ fn generate_expr_atomic(expr: OptimizedExpr) -> TokenStream {
                 quote! { ::alloc::borrow::Cow::Borrowed(#tag) }
             };
             quote! {
-                #expr.and_then(|state| state.tag_node(#tag_cow))
+                #expr.and_then(|state| state.tag_node(#tag))
             }
         }
     }
@@ -813,6 +833,11 @@ mod tests {
                 pub enum Rule {
                     #[doc = "This is rule comment"]
                     r#f
+                }
+                impl Rule {
+                    pub fn all_rules() -> &'static [Rule] {
+                        &[Rule::r#f]
+                    }
                 }
             }
             .to_string()
@@ -1144,6 +1169,11 @@ mod tests {
                     r#a,
                     #[doc = "If statement"]
                     r#if
+                }
+                impl Rule {
+                    pub fn all_rules() -> &'static [Rule] {
+                        &[Rule::r#a, Rule::r#if]
+                    }
                 }
 
                 #[allow(clippy::all)]
