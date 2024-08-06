@@ -11,3 +11,4 @@
      postfix  =  _{ fac }
        fac    =   { "!" } // Factorial
      primary  =  _{ int | "(" ~ expr ~ ")" }
+     int      =  @{ '0'..'9'+ }

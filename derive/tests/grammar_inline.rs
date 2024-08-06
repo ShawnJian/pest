@@ -6,7 +6,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
-use alloc::{format, vec::Vec};
+use alloc::format;
 
 #[macro_use]
 extern crate pest;

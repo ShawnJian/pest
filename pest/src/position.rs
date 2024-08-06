@@ -20,19 +20,12 @@ use crate::span;
 #[derive(Clone, Copy)]
 pub struct Position<'i> {
     input: &'i str,
-    /// # Safety:
-    ///
-    /// `input[pos..]` must be a valid codepoint boundary (should not panic when indexing thus).
     pos: usize,
 }
 
 impl<'i> Position<'i> {
     /// Create a new `Position` without checking invariants. (Checked with `debug_assertions`.)
-    ///
-    /// # Safety:
-    ///
-    /// `input[pos..]` must be a valid codepoint boundary (should not panic when indexing thus).
-    pub(crate) unsafe fn new_unchecked(input: &str, pos: usize) -> Position<'_> {
+    pub(crate) fn new_internal(input: &str, pos: usize) -> Position<'_> {
         debug_assert!(input.get(pos..).is_some());
         Position { input, pos }
     }
@@ -101,9 +94,9 @@ impl<'i> Position<'i> {
     pub fn span_to(&self, other: usize) -> span::Span<'i> {
         // This is safe because the pos field of a Position should always be a valid str index.
         if self.pos > other {
-            unsafe { span::Span::new_unchecked(self.input, other, self.pos) }
+            span::Span::new_internal(self.input, other, self.pos)
         } else {
-            unsafe { span::Span::new_unchecked(self.input, self.pos, other) }
+            span::Span::new_internal(self.input, self.pos, other)
         }
     }
 
@@ -131,9 +124,9 @@ impl<'i> Position<'i> {
         {
             // This is safe because the pos field of a Position should always be a valid str index.
             if self.pos > other.pos {
-                unsafe { span::Span::new_unchecked(self.input, other.pos, self.pos) }
+                span::Span::new_internal(self.input, other.pos, self.pos)
             } else {
-                unsafe { span::Span::new_unchecked(self.input, self.pos, other.pos) }
+                span::Span::new_internal(self.input, self.pos, other.pos)
             }
         } else {
             // TODO: maybe a panic if self.pos < other.pos
